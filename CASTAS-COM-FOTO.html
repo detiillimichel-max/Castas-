@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-br"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>CASTAS</title><style>
+:root{--bg:#0a0a0f;--sur:#15151c;--sur2:#1f1f2a;--bd:rgba(255,255,255,.13);--tx:#ececf6;--mu:#8e8ea3;--ac:#00e5ff;--gold:#c8a96e}
+*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%;background:var(--bg);color:var(--tx);font-family:system-ui,Segoe UI,Roboto,sans-serif;overflow:hidden}
+.screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;padding:18px;overflow:auto}.screen.on{display:flex}
+.logo{font-weight:800;letter-spacing:7px;font-size:2.3rem;margin-top:18px;background:linear-gradient(90deg,var(--gold),#fff,var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{font-size:.68rem;letter-spacing:3px;color:var(--mu);margin:8px 0 18px;text-transform:uppercase}
+.list{width:100%;max-width:380px;display:flex;flex-direction:column;gap:10px}
+.card{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--sur);border:1px solid var(--bd);border-radius:18px;cursor:pointer;position:relative}
+.card.sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}
+.av{width:48px;height:48px;border-radius:50%;background:var(--sur2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-weight:800;overflow:hidden;flex-shrink:0;position:relative}
+.av img{width:100%;height:100%;object-fit:cover}
+.av .edit{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:.65rem;opacity:0;transition:.2s}.card:hover .av .edit{opacity:1}
+.btn{width:100%;max-width:380px;padding:15px;border-radius:16px;border:0;font-weight:800;letter-spacing:2px;cursor:pointer}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#f3e2b6);color:#111;margin-top:14px}.btn-gold:disabled{opacity:.35}
+.btn-ghost{background:transparent;border:1px dashed var(--bd);color:var(--ac);margin-top:10px}
+#app{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg)}#app.on{display:flex}
+.top{height:56px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--bd)}
+.msgs{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.bubble{max-width:80%;padding:10px 13px;border-radius:18px;font-size:.93rem;line-height:1.35}.me{align-self:flex-end;background:var(--ac);color:#000;border-bottom-right-radius:6px}.them{align-self:flex-start;background:var(--sur2);border:1px solid var(--bd);border-bottom-left-radius:6px}
+.bar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--bd);background:var(--sur)}.bar input{flex:1;background:var(--sur2);border:1px solid var(--bd);border-radius:24px;padding:11px 14px;color:var(--tx);outline:0}.send{width:42px;height:42px;border-radius:50%;border:0;background:var(--ac);font-weight:900}
+</style></head><body>
+<input type="file" id="fileFoto" accept="image/*" hidden>
+<div id="login" class="screen on">
+<div class="logo">CASTAS</div><div class="sub">Mensagens • Família • Social</div>
+<div style="width:100%;max-width:380px;color:var(--mu);font-size:.68rem;letter-spacing:2px;text-transform:uppercase;margin:6px 0">Quem é você? toque na foto para trocar</div>
+<div id="lista" class="list"></div>
+<button class="btn btn-ghost" onclick="novo()">+ Adicionar membro com foto</button>
+<button id="btnEntrar" class="btn btn-gold" disabled onclick="entrar()">ENTRAR</button>
+</div>
+<div id="app"><div class="top"><button onclick="voltar()" style="background:none;border:0;color:var(--ac);font-size:1.4rem">←</button><div id="cAv" class="av" style="width:34px;height:34px"></div><div style="flex:1"><div id="cNome" style="font-weight:700"></div><div style="font-size:.64rem;color:var(--ac)">online • Supabase</div></div><button onclick="sair()" style="background:var(--sur2);border:1px solid var(--bd);border-radius:18px;padding:6px 10px;color:var(--tx)">Sair</button></div><div id="msgs" class="msgs"></div><div class="bar"><input id="inp" placeholder="Mensagem..."><button class="send" onclick="enviar()">↑</button></div></div>
+<script>
+const def=[{id:"michel",nome:"Michel",tag:"ADMIN",foto:""},{id:"gabriela",nome:"Gabriela",tag:"FAMÍLIA",foto:""}];
+let membros=JSON.parse(localStorage.getItem("castas_membros_v2")||"null")||def;
+let sel=null, pendingId=null;
+let EU={id:localStorage.getItem("castas_id")||"",nome:localStorage.getItem("castas_nome")||""};
+const $=i=>document.getElementById(i);
+const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+function saveM(){localStorage.setItem("castas_membros_v2",JSON.stringify(membros))}
+function avHTML(m, size=48){ if(m.foto){return `<img src="${m.foto}" alt="">`} return esc(m.nome[0].toUpperCase()); }
+function render(){
+ const el=$("lista");el.innerHTML="";
+ membros.forEach(m=>{
+  const d=document.createElement("div");d.className="card"+(sel&&sel.id===m.id?" sel":"");
+  d.innerHTML=`<div class="av" onclick="event.stopPropagation();trocarFoto('${m.id}')">${m.foto?`<img src="${m.foto}">`:esc(m.nome[0].toUpperCase())}<span class="edit">📷</span></div><div style="flex:1" onclick="selecionar('${m.id}')"><div style="font-weight:700">${esc(m.nome)}</div><div style="font-size:.62rem;color:#8e8ea3">${esc(m.tag)}</div></div><div onclick="selecionar('${m.id}')" style="color:var(--ac)">${sel&&sel.id===m.id?"✓":""}</div>`;
+  el.appendChild(d);
+ });
+}
+window.selecionar=(id)=>{sel=membros.find(x=>x.id===id);$("btnEntrar").disabled=!sel;render();}
+window.trocarFoto=(id)=>{pendingId=id;$("fileFoto").click();}
+$("fileFoto").addEventListener("change", async (e)=>{
+ const f=e.target.files[0]; if(!f) return;
+ const dataUrl = await resize(f, 160);
+ if(pendingId==="novo"){
+   const nome = prompt("Nome do membro:"); if(!nome) return;
+   const id = nome.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now();
+   membros.push({id,nome:nome.slice(0,18),tag:"MEMBRO",foto:dataUrl}); saveM(); render();
+ } else {
+   const m=membros.find(x=>x.id===pendingId); if(m){m.foto=dataUrl; saveM(); render(); if(EU.id===m.id) localStorage.setItem("castas_foto",dataUrl);}
+ }
+ e.target.value=""; pendingId=null;
+});
+function resize(file, max){return new Promise(res=>{const img=new Image();const r=new FileReader();r.onload=()=>{img.src=r.result};r.readAsDataURL(file);img.onload=()=>{const c=document.createElement("canvas");let w=img.width,h=img.height;if(w>h){if(w>max){h*=max/w;w=max}}else{if(h>max){w*=max/h;h=max}}c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);res(c.toDataURL("image/jpeg",0.75))}})}
+window.novo=()=>{pendingId="novo";$("fileFoto").click(); if(!pendingId) { /*fallback sem foto*/ const n=prompt("Nome (sem foto):"); if(n){const id=n.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now();membros.push({id,nome:n.slice(0,18),tag:"MEMBRO",foto:""});saveM();render();}}};
+window.entrar=()=>{if(!sel){alert("Toque no Michel ou Gabriela primeiro");return}EU={id:sel.id,nome:sel.nome};localStorage.setItem("castas_id",EU.id);localStorage.setItem("castas_nome",EU.nome);abrirApp();}
+function abrirApp(){
+ document.getElementById("login").classList.remove("on");document.getElementById("app").classList.add("on");
+ const outros=membros.filter(m=>m.id!==EU.id); const alvo=outros[0]||membros[0];
+ window._conv={id:[EU.id,alvo.id].sort().join("__"),pid:alvo.id,nome:alvo.nome};
+ $("cNome").textContent=alvo.nome; const mAlvo=membros.find(x=>x.id===alvo.id); $("cAv").innerHTML=mAlvo&&mAlvo.foto?`<img src="${mAlvo.foto}">`:esc(alvo.nome[0]);
+ $("msgs").innerHTML=`<div class="bubble them">Pronto ${esc(EU.nome)}! Agora com foto. Toque na bolinha 📷 para trocar sua foto quando quiser.</div>`;
+ if(window.initChat) window.initChat();
+}
+window.voltar=()=>{document.getElementById("app").classList.remove("on");document.getElementById("login").classList.add("on");render();}
+window.sair=()=>{localStorage.removeItem("castas_id");localStorage.removeItem("castas_nome");location.reload();}
+render();
+if(EU.id){const f=membros.find(x=>x.id===EU.id); if(f) sel=f; $("btnEntrar").disabled=!sel; render();}
+</script>
+<script type="module">
+import {createClient} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+const sb=createClient("https://uqdwtzlkqaosnweyoyit.supabase.co","sb_publishable_uafBQD1aJ3w8_eq4meOsNQ_wzk8TwhA");
+let ch=null;
+function add(m){const EUid=localStorage.getItem("castas_id");const d=document.createElement("div");d.className="bubble "+(m.sender_id===EUid?"me":"them");d.textContent=m.content||"";document.getElementById("msgs").appendChild(d);document.getElementById("msgs").scrollTop=1e9}
+window.initChat=async()=>{const c=window._conv; if(!c) return; const {data}=await sb.from("direct_messages").select("*").eq("conversation_key",c.id).order("created_at",{ascending:true}).limit(80);(data||[]).forEach(add); if(ch) sb.removeChannel(ch); ch=sb.channel("c_"+c.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"direct_messages",filter:`conversation_key=eq.${c.id}`},p=>add(p.new)).subscribe();}
+window.enviar=async()=>{const i=document.getElementById("inp");const t=i.value.trim(); if(!t||!window._conv) return; i.value=""; await sb.from("direct_messages").insert({sender_id:localStorage.getItem("castas_id"),recipient_id:window._conv.pid,conversation_key:window._conv.id,content:t,type:"text"});}
+</script>
+</body></html>
